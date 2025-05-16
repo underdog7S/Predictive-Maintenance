@@ -1,27 +1,15 @@
 import streamlit as st
 import pandas as pd
-import joblib
 import numpy as np
 import matplotlib.pyplot as plt
 from datetime import datetime
 import os
+import requests
 
 st.set_page_config(page_title="Predictive Maintenance", layout="wide")
 
-# Load model
-@st.cache_resource
-def load_model():
-    return joblib.load('models/model.pkl')
-
-try:
-    model = load_model()
-except FileNotFoundError:
-    st.error("Model file not found. Ensure 'model.pkl' exists in the 'models' folder.")
-
 st.title("🔧 Predictive Maintenance - AI Dashboard")
 st.markdown("Use the controls on the left to enter machine parameters and predict failures.")
-
-
 
 # Sidebar Inputs
 with st.sidebar:
@@ -57,11 +45,17 @@ input_df = pd.DataFrame([{
     'RNF': RNF
 }])
 
-# Prediction
-prediction = model.predict(input_df)[0]
-probas = model.predict_proba(input_df)[0]
-failure_prob = round(probas[1] * 100, 2)
-normal_prob = round(probas[0] * 100, 2)
+# Prediction using API
+try:
+    response = requests.post("http://127.0.0.1:8000/predict", json=input_df.to_dict(orient="records")[0])
+    response.raise_for_status()
+    prediction_data = response.json()
+    prediction = prediction_data["prediction"]
+    normal_prob = round(prediction_data["normal_probability"] * 100, 2)
+    failure_prob = round(prediction_data["failure_probability"] * 100, 2)
+except Exception as e:
+    st.error(f"Failed to get prediction: {e}")
+    st.stop()
 
 # Metrics
 st.subheader("🔍 Prediction Overview")
